@@ -17,14 +17,14 @@ if readme_file.exists():
 
 setup(
     name="quantum-sniffer",
-    version="0.2.0",
+    version="0.5.0",
     description="Post-Quantum Cryptography Network Analysis Tool",
     long_description=long_description,
     long_description_content_type="text/markdown",
     author="Illumio Community",
     author_email="community@illumio.com",
     url="https://github.com/illumio-community/quantum-sniffer",
-    license="MIT",
+    license="GPL-3.0",
     
     # Python version requirement
     python_requires=">=3.6",
@@ -76,7 +76,7 @@ setup(
         "Intended Audience :: Information Technology",
         "Intended Audience :: System Administrators",
         "Intended Audience :: Telecommunications Industry",
-        "License :: OSI Approved :: MIT License",
+        "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
         "Operating System :: POSIX :: Linux",
         "Operating System :: MacOS :: MacOS X",
         "Programming Language :: Python :: 3",
