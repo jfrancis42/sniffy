@@ -15,7 +15,7 @@ each one as **post-quantum secure**, **hybrid**, **classical**, or **unknown**.
 - **Dual output**: CSV (spreadsheet-friendly) + JSONL (complete event data)
 - **Skynet report**: Harvest-now-decrypt-later exposure analysis
 
-### Active Probing (NEW in v0.4.0)
+### Active Probing
 - **Test targets** for post-quantum crypto support without waiting for traffic
 - **Auto-detection**: Probes TLS, SSH, STARTTLS (SMTP/IMAP/POP3/FTP), IKEv2 based on port
 - **Bulk scanning**: CIDR subnets, IP ranges, comma-separated lists
@@ -23,29 +23,12 @@ each one as **post-quantum secure**, **hybrid**, **classical**, or **unknown**.
 - **Rich output**: JSON with metadata, Markdown reports, stdout display
 - **SNI support**: Works with virtual hosting and name-based servers
 
-### Illumio PCE Integration (NEW in v0.4.1)
-- **Auto-labeling**: Scan workloads and automatically update Illumio PCE labels with PQC status
-- **Compliance tracking**: Use `pqc` labels to track quantum-readiness across infrastructure
-- **Policy integration**: Build Illumio policies based on PQ crypto support
-- **Bulk operations**: Initialize all workloads, generate compliance reports
-- **Python API**: Integrate into custom automation workflows
-
-### Self-Scan Mode (NEW in v0.4.2)
-- **Automated daily scans**: Discover and test external services automatically
-- **Zero configuration**: Automatically finds services bound to external interfaces
-- **JSON output**: Complete structured results for integration
-- **Cron deployment**: One-command setup for daily execution
-- **Fleet-ready**: Deploy across hundreds of machines independently
-
 ## Install
 
 **From PyPI** (recommended):
 
 ```bash
 pip install quantum-sniffer
-
-# To upgrade an existing installation:
-pip install --upgrade quantum-sniffer
 ```
 
 **From source** (for development):
@@ -60,7 +43,6 @@ pip install -e '.[dev]'
 - Python 3.9+
 - `scapy` (required for packet capture)
 - `cryptography` (optional, unlocks QUIC Initial-packet decryption)
-- `illumio` (optional, for Illumio PCE integration)
 
 **Install optional dependencies:**
 
@@ -68,16 +50,12 @@ pip install -e '.[dev]'
 # For QUIC support
 pip install cryptography
 
-# For Illumio PCE integration
-pip install illumio
-
 # Install everything
-pip install quantum-sniffer cryptography illumio
+pip install quantum-sniffer cryptography
 ```
 
-After install, the `quantum-sniffer` console script is on `$PATH`. If
-you'd rather not install, every example below works with
-`python3 -m quantum_sniffer …` from the repo root.
+After install, the `quantum-sniffer` console script is on `$PATH`. If you'd rather not install, 
+every example below works with `python3 -m quantum_sniffer …` from the repo root.
 
 ## Quick Start
 
@@ -115,93 +93,6 @@ quantum-sniffer --probe 192.168.1.1-50 --ports 443 --workers 20
 quantum-sniffer --probe 10.1.1.10,10.1.1.20,10.1.1.30 --ports 22,443
 ```
 
-### Automated Monitoring: Two Modes
-
-Quantum-sniffer supports two distinct monitoring approaches:
-
-#### Mode 1: Daily Active Scanning (`--daily`)
-
-Active scanning with `self-scan.py` - probes services once per day:
-
-```bash
-# Deploy daily active scanning
-cd quantum-sniffer
-sudo ./deploy-monitor.sh --daily
-
-# Or user-only (no sudo)
-./deploy-monitor.sh --daily --user-cron
-
-# Manual execution
-./self-scan.py > today-scan.json
-
-# View results
-jq '.summary' /var/log/quantum-sniffer/self-scan.json
-```
-
-**What it does:**
-- Discovers externally-accessible services (excludes localhost)
-- **Actively probes** each service with `quantum-sniffer --probe`
-- Runs once daily at 2 AM via cron
-- Outputs JSON report to `/var/log/quantum-sniffer/self-scan.json`
-- Suitable for compliance audits and periodic checks
-
-#### Mode 2: Persistent Passive Monitoring (`--persistent`)
-
-Continuous traffic analysis with `persistent-monitor.py` - monitors actual connections:
-
-```bash
-# Deploy persistent passive monitoring
-cd quantum-sniffer
-sudo ./deploy-monitor.sh --persistent
-
-# Check status
-sudo systemctl status quantum-sniffer-monitor@eth0
-
-# View logs
-sudo journalctl -u quantum-sniffer-monitor@eth0 -f
-tail -f /var/log/quantum-sniffer/pqc-monitor-*.jsonl
-```
-
-**What it does:**
-- **Passively captures** live network traffic (no active probing)
-- Analyzes PQC status of real incoming/outgoing connections
-- Runs continuously as a systemd daemon
-- Logs to rolling JSONL files
-- Suitable for real-time monitoring and traffic analysis
-- Integrates with UPCE for centralized collection
-
-**Key Difference:**
-- **Daily mode** = Active probing (like nmap for PQC)
-- **Persistent mode** = Passive monitoring (like tcpdump + analysis)
-
-### Illumio Integration
-
-**Prerequisites:** `pip install illumio` and configure environment variables:
-
-```bash
-export ILLUMIO_PCE_HOST=pce.example.com
-export ILLUMIO_API_KEY=api_1234567890abcdef
-export ILLUMIO_API_SECRET=1234567890abcdef1234567890abcdef
-```
-
-**Commands:**
-
-```bash
-# Initialize all workloads with pqc=unknown label
-quantum-sniffer --illumio-init
-
-# Scan a workload and update its PQC label
-quantum-sniffer --probe 10.1.1.50 --ports 22,443 --illumio-label 10.1.1.50
-
-# View PQC compliance summary
-quantum-sniffer --illumio-summary
-
-# Bulk scan and label (example script)
-for ip in 10.1.1.{50..60}; do
-  quantum-sniffer --probe "$ip" --ports 22,443 --illumio-label "$ip"
-done
-```
-
 ## Usage
 
 ### Passive Capture Mode
@@ -216,13 +107,11 @@ This creates **two files**:
 - `capture.csv` — flattened data (17 columns) for spreadsheet analysis
 - `capture.jsonl` — complete event data with nested structures
 
-Live mode requires root (or `cap_net_raw` on Linux: `sudo setcap
-cap_net_raw+ep $(readlink -f $(which python3))`).
+Live mode requires root (or `cap_net_raw` on Linux: `sudo setcap cap_net_raw+ep $(readlink -f $(which python3))`).
 
 **Replay a saved pcap:**
 
-No root needed — useful for regression testing and analyzing captures
-collected elsewhere.
+No root needed — useful for regression testing and analyzing captures collected elsewhere.
 
 ```bash
 quantum-sniffer -o capture -r some.pcap
@@ -230,9 +119,7 @@ quantum-sniffer -o capture -r some.pcap
 
 **Common flags:**
 
-- `-o, --output PATH` — base filename for output logs (extensions `.csv` 
-  and `.jsonl` added automatically). Defaults to `quantum-log` if not specified.
-  Not used by `--find-sarah-connor`.
+- `-o, --output PATH` — base filename for output logs (extensions `.csv` and `.jsonl` added automatically). Defaults to `quantum-log` if not specified.
 - `-i, --interface IFACE` — capture interface (default: scapy's default)
 - `-r, --read FILE.pcap` — analyze a saved capture instead of going live
 - `-a, --all` — include unencrypted protocols (HTTP, plain DNS, etc.)
@@ -315,131 +202,6 @@ quantum-sniffer --probe 10.1.1.0/24 --ports 22,443 \
 - **IKEv2/IPsec** (ports 500, 4500) - Basic probe (simplified)
 
 Protocol is auto-detected based on port number.
-
-### Illumio PCE Integration Mode
-
-> **⚠️ WARNING: This feature is UNTESTED in this version. Use with caution in production environments.**
-
-Quantum-sniffer can integrate with Illumio Policy Compute Engine to automatically label workloads with their post-quantum crypto status.
-
-**Prerequisites:**
-
-1. Install Illumio SDK:
-   ```bash
-   pip install illumio
-   ```
-
-2. Configure PCE credentials (create `.env` file or export variables):
-   ```bash
-   export ILLUMIO_PCE_HOST=pce.example.com
-   export ILLUMIO_API_KEY=api_1234567890abcdef
-   export ILLUMIO_API_SECRET=1234567890abcdef1234567890abcdef
-   # Optional:
-   export ILLUMIO_PCE_PORT=443
-   export ILLUMIO_ORG_ID=1
-   ```
-
-3. Create API key in PCE with permissions:
-   - `workloads:read`, `workloads:write`
-   - `labels:read`, `labels:write`
-
-**Initialize all workloads:**
-
-Adds `pqc=unknown` label to all workloads that don't have a PQC label:
-
-```bash
-quantum-sniffer --illumio-init
-```
-
-This will:
-- Connect to Illumio PCE
-- Count workloads without a `pqc` label
-- Show a warning and require confirmation (type "yes")
-- Bulk update all unlabeled workloads
-
-Skip confirmation (for automation):
-```bash
-quantum-sniffer --illumio-init --yes
-```
-
-**Scan and label a workload:**
-
-Probe a workload and automatically update its Illumio label:
-
-```bash
-# Scan and label in one command
-quantum-sniffer --probe 10.1.1.50 --ports 22,443 --illumio-label 10.1.1.50
-```
-
-This will:
-1. Probe the IP address on specified ports
-2. Determine PQC status from probe results
-3. Find workload in Illumio PCE by IP address
-4. Create or update the `pqc` label with detected status
-
-**View compliance summary:**
-
-```bash
-quantum-sniffer --illumio-summary
-```
-
-Output shows:
-- Total workloads
-- Count by PQC status (yes/hybrid/no/unknown/not_labeled)
-- Labeling progress percentage
-- PQ-capable percentage
-
-**Label values:**
-
-- `yes` - Pure post-quantum secure
-- `hybrid` - PQ + classical (transition mode)
-- `no` - Classical only (quantum-vulnerable)
-- `unknown` - Not yet scanned
-
-**Bulk workflow example:**
-
-```bash
-#!/bin/bash
-# 1. Initialize all workloads
-quantum-sniffer --illumio-init --yes
-
-# 2. Scan network
-quantum-sniffer --probe 10.1.0.0/23 --ports 22,443 \
-  --output-json scan.json --workers 50
-
-# 3. Label workloads from scan
-jq -r '.results[] | select(.status == "open") | .target_ip' scan.json | \
-  sort -u | while read ip; do
-    quantum-sniffer --probe "$ip" --ports 22,443 --illumio-label "$ip"
-  done
-
-# 4. View summary
-quantum-sniffer --illumio-summary
-```
-
-**Python API:**
-
-```python
-from quantum_sniffer.integrations.illumio import IllumioIntegration
-from quantum_sniffer.lib import probe_target
-
-# Connect to PCE
-illumio = IllumioIntegration()
-
-# Probe workload
-results = probe_target('10.1.1.50', ports=[443])
-pqc_value = results[0].post_quantum_secure.lower()
-
-# Update label
-illumio.update_workload_pqc_label('10.1.1.50', pqc_value)
-
-# Get summary
-summary = illumio.get_workload_summary()
-print(f"Total: {summary['total']}")
-print(f"PQ-capable: {summary['by_pqc_status']['yes'] + summary['by_pqc_status']['hybrid']}")
-```
-
-**See full documentation:** [ILLUMIO_INTEGRATION.md](ILLUMIO_INTEGRATION.md)
 
 ## Post-Quantum Classification
 
@@ -578,7 +340,7 @@ Summary: 2/4 ports open
 
 ## Library Usage
 
-All functionality is available as a Python library:
+All functionality is available as a Python library. See `example_library_usage.py` for complete examples.
 
 ### Passive Analysis
 
@@ -758,6 +520,13 @@ quantum-sniffer --probe critical-servers.txt --ports 22,443 \
   --output-json daily-probe-$(date +%Y%m%d).json
 ```
 
+### Quick Network Scan
+
+```bash
+# Use the included scan script
+./scan-network.sh 10.1.1.0/24
+```
+
 ## Testing
 
 ```bash
@@ -770,8 +539,6 @@ SSH KEX parsing, IKEv2 SA parsing (including ML-KEM transform IDs), the
 dual CSV/JSONL writer, CLI argument handling, and the Skynet report.
 
 ## Building for PyPI
-
-The repo ships `pyproject.toml` and `MANIFEST.in`, so:
 
 ```bash
 pip install --user build twine
@@ -815,87 +582,6 @@ Port scanning without authorization likely violates the Computer Fraud and Abuse
 - Respect robots.txt and security.txt
 - Document authorization in writing
 - Comply with local laws
-
-## Illumio Integration
-
-Quantum-sniffer can automatically label Illumio PCE workloads with their PQ crypto status:
-
-```bash
-# Initialize all workloads with pqc=unknown
-quantum-sniffer --illumio-init
-
-# Scan and label a workload
-quantum-sniffer --probe 10.1.1.50 --ports 22,443 --illumio-label 10.1.1.50
-
-# View compliance summary
-quantum-sniffer --illumio-summary
-```
-
-See **[ILLUMIO_INTEGRATION.md](ILLUMIO_INTEGRATION.md)** for complete documentation.
-
-## Self-Scan Mode
-
-Deploy automated daily scanning on each machine:
-
-```bash
-cd quantum-sniffer
-
-# Deploy (one command)
-sudo ./deploy-self-scan.sh
-
-# View results
-cat /var/log/quantum-sniffer/self-scan.json
-jq '.summary' /var/log/quantum-sniffer/self-scan.json
-```
-
-**Features:**
-- Automatically discovers external services (excludes localhost)
-- Runs daily at 2 AM via cron
-- JSON output for easy integration
-- Deploy across entire fleet independently
-
-See **[SELF_SCAN.md](SELF_SCAN.md)** for complete documentation.
-
-## Ansible Deployment
-
-Run quantum-sniffer on remote hosts **without installing anything permanently**:
-
-```bash
-cd ansible
-
-# Generate inventory from UPCE
-./generate-inventory-from-upce.py > inventory.ini
-
-# Run scan on all hosts
-ansible-playbook -i inventory.ini run-quantum-sniffer.yml
-
-# View results
-ls results/
-```
-
-The Ansible playbook:
-- Creates temporary environment on remote host
-- Installs dependencies in isolated venv
-- Runs scan and fetches results
-- **Deletes everything** (guaranteed cleanup)
-
-See **[ANSIBLE_DEPLOYMENT.md](ANSIBLE_DEPLOYMENT.md)** for complete documentation.
-
-## Documentation
-
-- **README.md** (this file) - Getting started and usage
-- **PROBING.md** - Complete active probing documentation
-- **SELF_SCAN.md** - Automated daily self-scanning
-- **ILLUMIO_INTEGRATION.md** - Illumio PCE integration guide (⚠️ UNTESTED)
-- **ANSIBLE_DEPLOYMENT.md** - Zero-install remote execution via Ansible
-- **REFACTORING_SUMMARY.md** - Library architecture details
-- **example_library_usage.py** - Passive analysis examples
-- **example_probing.py** - Active probing examples
-- **example_illumio_integration.py** - Illumio integration examples (⚠️ UNTESTED)
-- **ansible/** - Ansible playbooks and examples
-- **discover-external-services.py** - Service discovery tool
-- **self-scan.py** - Self-scan script
-- **deploy-self-scan.sh** - Self-scan deployment automation
 
 ## License
 
