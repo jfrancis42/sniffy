@@ -20,7 +20,6 @@ Usage:
 
 import sys
 import os
-import json
 import signal
 import subprocess
 import socket
@@ -36,8 +35,9 @@ def get_default_interface():
         # Get default route interface
         result = subprocess.run(
             ['ip', 'route', 'show', 'default'],
-            capture_output=True,
-            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            universal_newlines=True,
             timeout=5
         )
 
@@ -51,10 +51,11 @@ def get_default_interface():
                         return parts[dev_idx + 1]
 
         # Fallback: try eth0, ens3, en0
-        for iface in ['eth0', 'ens3', 'en0']:
+        for iface in ['eth0', 'ens3', 'en0', 'ens192']:
             result = subprocess.run(
                 ['ip', 'link', 'show', iface],
-                capture_output=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
                 timeout=5
             )
             if result.returncode == 0:
@@ -78,24 +79,16 @@ def find_quantum_sniffer():
     """Find quantum-sniffer executable."""
     # Try venv first
     script_dir = Path(__file__).parent
-    venv_python = script_dir / 'venv' / 'bin' / 'python3'
+    venv_qs = script_dir / 'venv' / 'bin' / 'quantum-sniffer'
 
-    if venv_python.exists():
-        return [str(venv_python), '-m', 'quantum_sniffer']
+    if venv_qs.exists():
+        return [str(venv_qs)]
 
     # Try system
     try:
         subprocess.run(['quantum-sniffer', '--help'],
-                      capture_output=True, timeout=2)
+                      stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=2)
         return ['quantum-sniffer']
-    except (FileNotFoundError, subprocess.TimeoutExpired):
-        pass
-
-    # Try python module
-    try:
-        subprocess.run(['python3', '-m', 'quantum_sniffer', '--help'],
-                      capture_output=True, timeout=2)
-        return ['python3', '-m', 'quantum_sniffer']
     except (FileNotFoundError, subprocess.TimeoutExpired):
         pass
 
@@ -135,7 +128,7 @@ class PersistentMonitor:
         # Find quantum-sniffer
         self.cmd = find_quantum_sniffer()
         if not self.cmd:
-            raise RuntimeError("quantum-sniffer not found (try: pip install quantum-sniffer)")
+            raise RuntimeError("quantum-sniffer not found (install with: pip install -e /opt/quantum-sniffer)")
 
     def signal_handler(self, signum, frame):
         """Handle shutdown signals."""
@@ -178,7 +171,7 @@ class PersistentMonitor:
                     cmd,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
-                    text=True
+                    universal_newlines=True
                 )
 
                 # Monitor process
@@ -227,7 +220,7 @@ def main():
     parser = argparse.ArgumentParser(
         description='Persistent PQC monitoring daemon',
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
+        epilog='''
 Examples:
   # Monitor default interface
   sudo ./persistent-monitor.py
@@ -235,44 +228,29 @@ Examples:
   # Monitor specific interface
   sudo ./persistent-monitor.py --interface eth0
 
-  # Custom output directory
-  sudo ./persistent-monitor.py --output-dir /var/log/quantum-sniffer
+  # Custom log directory
+  sudo ./persistent-monitor.py --output-dir /var/log/pqc
 
-  # Verbose output (show each connection)
+  # Verbose mode (show each connection)
   sudo ./persistent-monitor.py --verbose
-
-Note: Requires root/sudo for packet capture.
-"""
+        '''
     )
 
-    parser.add_argument(
-        '-i', '--interface',
-        help='Network interface to monitor (default: auto-detect)'
-    )
-
-    parser.add_argument(
-        '-o', '--output-dir',
-        default='/var/log/quantum-sniffer',
-        help='Directory for log files (default: /var/log/quantum-sniffer)'
-    )
-
-    parser.add_argument(
-        '-v', '--verbose',
-        action='store_true',
-        help='Show each connection on console (default: quiet)'
-    )
+    parser.add_argument('-i', '--interface',
+                       help='Network interface to monitor (default: auto-detect)')
+    parser.add_argument('-o', '--output-dir',
+                       default='/var/log/quantum-sniffer',
+                       help='Directory for log files (default: /var/log/quantum-sniffer)')
+    parser.add_argument('-v', '--verbose',
+                       action='store_true',
+                       help='Show each connection on console (default: quiet)')
 
     args = parser.parse_args()
 
-    # Check for root
-    if os.geteuid() != 0:
-        print("Error: Packet capture requires root privileges", file=sys.stderr)
-        print("Please run with: sudo ./persistent-monitor.py", file=sys.stderr)
-        sys.exit(1)
-
     # Detect interface if not specified
-    interface = args.interface or get_default_interface()
+    interface = args.interface if args.interface else get_default_interface()
 
+    # Create and start monitor
     try:
         monitor = PersistentMonitor(
             interface=interface,
@@ -281,8 +259,7 @@ Note: Requires root/sudo for packet capture.
         )
         monitor.start()
     except KeyboardInterrupt:
-        print("\nInterrupted by user")
-        sys.exit(0)
+        pass
     except Exception as e:
         print(f"Fatal error: {e}", file=sys.stderr)
         sys.exit(1)

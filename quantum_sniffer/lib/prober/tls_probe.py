@@ -11,13 +11,25 @@ from ..pq import classify_tls_group, HYBRID, PQ, CLASSICAL
 
 
 # Map SSL/TLS version constants to readable strings
-TLS_VERSION_NAMES = {
-    ssl.TLSVersion.SSLv3: "SSL 3.0",
-    ssl.TLSVersion.TLSv1: "TLS 1.0",
-    ssl.TLSVersion.TLSv1_1: "TLS 1.1",
-    ssl.TLSVersion.TLSv1_2: "TLS 1.2",
-    ssl.TLSVersion.TLSv1_3: "TLS 1.3",
-}
+# Python 3.6 doesn't have TLSVersion enum, use PROTOCOL_ constants
+try:
+    # Python 3.7+
+    TLS_VERSION_NAMES = {
+        ssl.TLSVersion.SSLv3: "SSL 3.0",
+        ssl.TLSVersion.TLSv1: "TLS 1.0",
+        ssl.TLSVersion.TLSv1_1: "TLS 1.1",
+        ssl.TLSVersion.TLSv1_2: "TLS 1.2",
+        ssl.TLSVersion.TLSv1_3: "TLS 1.3",
+    }
+except AttributeError:
+    # Python 3.6 - use integer constants
+    TLS_VERSION_NAMES = {
+        0x0300: "SSL 3.0",
+        0x0301: "TLS 1.0",
+        0x0302: "TLS 1.1",
+        0x0303: "TLS 1.2",
+        0x0304: "TLS 1.3",
+    }
 
 
 def probe_tls(

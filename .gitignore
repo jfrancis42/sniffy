@@ -1,3 +1,6 @@
+# Keep directory (implementation notes, summaries, old scans)
+keep/
+
 # Add-ons directory (experimental features, utilities, examples)
 add-ons/
 stinky/
